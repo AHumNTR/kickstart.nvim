@@ -120,6 +120,18 @@ return {
       },
     }
 
+    dap.adapters.godot = {
+      type = 'server',
+      host = '127.0.0.1',
+      port = '6006',
+    }
+    dap.configurations.gdscript = {
+      type = 'godot',
+      request = 'launch',
+      name = 'Launch scene',
+      project = '$(workspaceFolder',
+      launch_scene = true,
+    }
     -- Change breakpoint icons
     -- vim.api.nvim_set_hl(0, 'DapBreak', { fg = '#e51400' })
     -- vim.api.nvim_set_hl(0, 'DapStop', { fg = '#ffcc00' })

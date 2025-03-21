@@ -83,7 +83,7 @@ I hope you enjoy your Neovim journey,
 
 P.S. You can delete this when you're done too. It's your config now! :)
 --]]
-
+-- disable netrw at the very start of your init.lua
 -- Set <space> as the leader key
 -- See `:help mapleader`
 --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
@@ -102,8 +102,12 @@ vim.g.have_nerd_font = false
 vim.o.number = true
 -- You can also add relative line numbers, to help with jumping.
 --  Experiment for yourself to see if you like it!
--- vim.o.relativenumber = true
-
+vim.opt.relativenumber = true
+local gdproject = io.open(vim.fn.getcwd() .. '/project.godot', 'r')
+if gdproject then
+  io.close(gdproject)
+  vim.fn.serverstart '127.0.0.1:6004'
+end
 -- Enable mouse mode, can be useful for resizing splits for example!
 vim.o.mouse = 'a'
 
@@ -205,6 +209,30 @@ vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper win
 -- vim.keymap.set("n", "<C-S-j>", "<C-w>J", { desc = "Move window to the lower" })
 -- vim.keymap.set("n", "<C-S-k>", "<C-w>K", { desc = "Move window to the upper" })
 
+vim.api.nvim_create_autocmd('TermOpen', {
+  group = vim.api.nvim_create_augroup('custom-term-open', { clear = true }),
+  callback = function()
+    vim.opt.number = false
+    vim.opt.relativenumber = false
+  end,
+})
+vim.keymap.set('n', '-', '<CMD>Oil<CR>', { desc = 'Open parent directory' })
+local job_id = 0
+vim.keymap.set('n', '<space>st', function()
+  vim.cmd.vnew()
+  vim.cmd.term()
+  vim.cmd.wincmd 'J'
+  vim.api.nvim_win_set_height(0, 15)
+  job_id = vim.bo.channel
+end)
+
+vim.keymap.set('n', '<space>mb', function()
+  vim.fn.chansend(job_id, { 'make build\r\n' })
+end, { desc = 'Make build' })
+
+vim.keymap.set('n', '<space>mr', function()
+  vim.fn.chansend(job_id, { 'make run\r\n' })
+end, { desc = 'Make Build' })
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
 
@@ -357,7 +385,28 @@ require('lazy').setup({
   -- you do for a plugin at the top level, you can do for a dependency.
   --
   -- Use the `dependencies` key to specify the dependencies of a particular plugin
-
+  {
+    'nvim-tree/nvim-tree.lua',
+    version = '*',
+    lazy = false,
+    dependencies = {
+      'nvim-tree/nvim-web-devicons',
+    },
+    config = function()
+      require('nvim-tree').setup {}
+    end,
+  },
+  {
+    'stevearc/oil.nvim',
+    ---@module 'oil'
+    ---@type oil.SetupOpts
+    opts = {},
+    -- Optional dependencies
+    dependencies = { { 'echasnovski/mini.icons', opts = {} } },
+    -- dependencies = { "nvim-tree/nvim-web-devicons" }, -- use if you prefer nvim-web-devicons
+    -- Lazy loading is not recommended because it is very tricky to make it work correctly in all situations.
+    lazy = false,
+  },
   { -- Fuzzy Finder (files, lsp, etc)
     'nvim-telescope/telescope.nvim',
     event = 'VimEnter',
@@ -661,6 +710,9 @@ require('lazy').setup({
       --  So, we create new capabilities with blink.cmp, and then broadcast that to the servers.
       local capabilities = require('blink.cmp').get_lsp_capabilities()
 
+      require('lspconfig').clangd.setup { cmd = { 'clangd --experimental-modules-support' } }
+
+      require('lspconfig').gdscript.setup(capabilities)
       -- Enable the following language servers
       --  Feel free to add/remove any LSPs that you want here. They will automatically be installed.
       --
@@ -671,7 +723,13 @@ require('lazy').setup({
       --  - settings (table): Override the default settings passed when initializing the server.
       --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
       local servers = {
-        -- clangd = {},
+        clangd = {
+          cmd = {
+            --'/home/humn/Downloads/LLVM-20.1.0-Linux-X64/bin/clangd',
+            'clangd',
+            '--experimental-modules-support',
+          },
+        },
         -- gopls = {},
         -- pyright = {},
         -- rust_analyzer = {},
@@ -682,7 +740,6 @@ require('lazy').setup({
         --
         -- But for many setups, the LSP (`ts_ls`) will work just fine
         -- ts_ls = {},
-        --
 
         lua_ls = {
           -- cmd = { ... },
@@ -713,6 +770,7 @@ require('lazy').setup({
       --
       -- You can add other tools here that you want Mason to install
       -- for you, so that they are available from within Neovim.
+
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
@@ -846,6 +904,9 @@ require('lazy').setup({
         -- Adjusts spacing to ensure icons are aligned
         nerd_font_variant = 'mono',
       },
+      -- Accept ([y]es) the completion.
+      --  This will auto-import if your LSP supports it.
+      --  This will expand snippets if the LSP sent a snippet.
 
       completion = {
         -- By default, you may press `<c-space>` to show the documentation.
@@ -886,8 +947,10 @@ require('lazy').setup({
     config = function()
       ---@diagnostic disable-next-line: missing-fields
       require('tokyonight').setup {
+        transparent = true,
         styles = {
-          comments = { italic = false }, -- Disable italics in comments
+          sidebars = 'transparent',
+          floats = 'transparent',
         },
       }
 
@@ -944,7 +1007,22 @@ require('lazy').setup({
     main = 'nvim-treesitter.configs', -- Sets main module to use for opts
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
     opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
+      ensure_installed = {
+        'gdscript',
+        'godot_resource',
+        'gdshader',
+        'bash',
+        'c',
+        'diff',
+        'html',
+        'lua',
+        'luadoc',
+        'markdown',
+        'markdown_inline',
+        'query',
+        'vim',
+        'vimdoc',
+      },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
@@ -954,7 +1032,7 @@ require('lazy').setup({
         --  the list of additional_vim_regex_highlighting and disabled languages for indent.
         additional_vim_regex_highlighting = { 'ruby' },
       },
-      indent = { enable = true, disable = { 'ruby' } },
+      indent = { enable = true, disable = { 'ruby', 'gdscript', 'godot_resource', 'gdshader' } },
     },
     -- There are additional nvim-treesitter modules that you can use to interact
     -- with nvim-treesitter. You should go explore a few and see what interests you:
@@ -963,7 +1041,7 @@ require('lazy').setup({
     --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
     --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
   },
-
+  { 'habamax/vim-godot', event = 'VimEnter' },
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
   -- init.lua. If you want these files, they are in the repository, so you can just download them and
   -- place them in the correct locations.
@@ -973,8 +1051,9 @@ require('lazy').setup({
   --  Here are some example plugins that I've included in the Kickstart repository.
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
-  -- require 'kickstart.plugins.debug',
+  require 'kickstart.plugins.debug',
   -- require 'kickstart.plugins.indent_line',
+
   -- require 'kickstart.plugins.lint',
   -- require 'kickstart.plugins.autopairs',
   -- require 'kickstart.plugins.neo-tree',
@@ -1011,6 +1090,31 @@ require('lazy').setup({
     },
   },
 })
+-- disable netrw at the very start of your init.lua
+vim.g.loaded_netrw = 1
+vim.g.loaded_netrwPlugin = 1
 
+-- optionally enable 24-bit colour
+vim.opt.termguicolors = true
+
+-- empty setup using defaults
+require('nvim-tree').setup()
+
+-- OR setup with some options
+require('nvim-tree').setup {
+  sort = {
+    sorter = 'case_sensitive',
+  },
+  view = {
+    width = 30,
+  },
+  renderer = {
+    group_empty = true,
+  },
+  filters = {
+    dotfiles = true,
+  },
+}
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
+--

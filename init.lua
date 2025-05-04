@@ -89,7 +89,9 @@ P.S. You can delete this when you're done too. It's your config now! :)
 --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
-
+--disables the swap file and auto syncs it instead
+vim.opt.autoread = true
+vim.opt.swapfile = false
 -- Set to true if you have a Nerd Font installed and selected in the terminal
 vim.g.have_nerd_font = false
 -- [[ Setting options ]]
@@ -223,12 +225,17 @@ vim.keymap.set('n', '<space>st', function()
   vim.cmd.wincmd 'J'
   vim.api.nvim_win_set_height(0, 15)
   job_id = vim.bo.channel
+
+  --  vim.fn.chansend(job_id, { 'cd ' .. vim.fn.getcwd() .. '\r\n' })
 end)
 
 vim.keymap.set('n', '<space>mb', function()
   vim.fn.chansend(job_id, { 'make build\r\n' })
 end, { desc = 'Make build' })
 
+vim.keymap.set('n', '<space>ma', function()
+  vim.fn.chansend(job_id, { 'make all\r\n' })
+end, { desc = 'Make all' })
 vim.keymap.set('n', '<space>mr', function()
   vim.fn.chansend(job_id, { 'make run\r\n' })
 end, { desc = 'Make Build' })
@@ -394,17 +401,6 @@ require('lazy').setup({
     config = function()
       require('nvim-tree').setup {}
     end,
-  },
-  {
-    'stevearc/oil.nvim',
-    ---@module 'oil'
-    ---@type oil.SetupOpts
-    opts = {},
-    -- Optional dependencies
-    dependencies = { { 'echasnovski/mini.icons', opts = {} } },
-    -- dependencies = { "nvim-tree/nvim-web-devicons" }, -- use if you prefer nvim-web-devicons
-    -- Lazy loading is not recommended because it is very tricky to make it work correctly in all situations.
-    lazy = false,
   },
   { -- Fuzzy Finder (files, lsp, etc)
     'nvim-telescope/telescope.nvim',
@@ -709,7 +705,7 @@ require('lazy').setup({
       --  So, we create new capabilities with blink.cmp, and then broadcast that to the servers.
       local capabilities = require('blink.cmp').get_lsp_capabilities()
 
-      require('lspconfig').clangd.setup { cmd = { 'clangd --experimental-modules-support' } }
+      require('lspconfig').clangd.setup {}
 
       require('lspconfig').gdscript.setup(capabilities)
       -- Enable the following language servers
@@ -727,6 +723,8 @@ require('lazy').setup({
             --'/home/humn/Downloads/LLVM-20.1.0-Linux-X64/bin/clangd',
             'clangd',
             '--experimental-modules-support',
+            '--header-insertion=never',
+            '--function-arg-placeholders=false',
           },
         },
         -- gopls = {},
@@ -897,7 +895,6 @@ require('lazy').setup({
         -- For more advanced Luasnip keymaps (e.g. selecting choice nodes, expansion) see:
         --    https://github.com/L3MON4D3/LuaSnip?tab=readme-ov-file#keymaps
       },
-
       appearance = {
         -- 'mono' (default) for 'Nerd Font Mono' or 'normal' for 'Nerd Font'
         -- Adjusts spacing to ensure icons are aligned
@@ -945,6 +942,43 @@ require('lazy').setup({
     priority = 1000, -- Make sure to load this before all the other start plugins.
     config = function()
       ---@diagnostic disable-next-line: missing-fields
+      require('image').setup {
+        backend = 'kitty',
+        processor = 'magick_cli', -- or "magick_cli"
+        integrations = {
+          markdown = {
+            enabled = true,
+            clear_in_insert_mode = false,
+            download_remote_images = true,
+            only_render_image_at_cursor = false,
+            floating_windows = false, -- if true, images will be rendered in floating markdown windows
+            filetypes = { 'markdown', 'vimwiki' }, -- markdown extensions (ie. quarto) can go here
+          },
+          neorg = {
+            enabled = true,
+            filetypes = { 'norg' },
+          },
+          typst = {
+            enabled = true,
+            filetypes = { 'typst' },
+          },
+          html = {
+            enabled = false,
+          },
+          css = {
+            enabled = false,
+          },
+        },
+        max_width = nil,
+        max_height = nil,
+        max_width_window_percentage = nil,
+        max_height_window_percentage = 50,
+        window_overlap_clear_enabled = false, -- toggles images when windows are overlapped
+        window_overlap_clear_ft_ignore = { 'cmp_menu', 'cmp_docs', 'snacks_notif', 'scrollview', 'scrollview_sign' },
+        editor_only_render_when_focused = false, -- auto show/hide images when the editor gains/looses focus
+        tmux_show_only_in_active_window = false, -- auto show/hide images in the correct Tmux window (needs visual-activity off)
+        hijack_file_patterns = { '*.png', '*.jpg', '*.jpeg', '*.gif', '*.webp', '*.avif' }, -- render image files as images when opened
+      }
       require('tokyonight').setup {
         transparent = true,
         styles = {
@@ -956,7 +990,7 @@ require('lazy').setup({
       -- Load the colorscheme here.
       -- Like many other themes, this one has different styles, and you could load
       -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
-      vim.cmd.colorscheme 'tokyonight-night'
+      vim.cmd.colorscheme 'retrobox'
     end,
   },
 
@@ -1093,6 +1127,7 @@ require('lazy').setup({
     },
   },
 })
+--
 -- disable netrw at the very start of your init.lua
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
@@ -1101,23 +1136,9 @@ vim.g.loaded_netrwPlugin = 1
 vim.opt.termguicolors = true
 
 -- empty setup using defaults
-require('nvim-tree').setup()
 
 -- OR setup with some options
-require('nvim-tree').setup {
-  sort = {
-    sorter = 'case_sensitive',
-  },
-  view = {
-    width = 30,
-  },
-  renderer = {
-    group_empty = true,
-  },
-  filters = {
-    dotfiles = true,
-  },
-}
+
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
 --
